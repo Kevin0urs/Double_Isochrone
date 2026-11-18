@@ -11,5 +11,5 @@
 // ====================================================================
 
 window.APP_CONFIG = {
-  ORS_API_KEY: "VOTRE_CLE_OPENROUTESERVICE"
+  ORS_API_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImU0OGI1NmNkODIxNTRjYTE4NjEzMzE2NWJiNmUxYjY2IiwiaCI6Im11cm11cjY0In0="
 };
