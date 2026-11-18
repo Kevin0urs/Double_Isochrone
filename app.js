@@ -547,7 +547,7 @@
     showStatus('Les paramètres ont été modifiés. Relancez le calcul.', 'warning');
   }
 
-  function clearIsochroneLayers() {
+  function removeIsochroneMapLayers() {
     if (state.layers.A) {
       state.map.removeLayer(state.layers.A);
       state.layers.A = null;
@@ -560,6 +560,10 @@
       state.map.removeLayer(state.layers.intersection);
       state.layers.intersection = null;
     }
+  }
+
+  function clearIsochroneLayers() {
+    removeIsochroneMapLayers();
     state.geojsonData.A = null;
     state.geojsonData.B = null;
     state.geojsonData.intersection = null;
@@ -730,7 +734,7 @@
   // 12. AFFICHAGE CARTOGRAPHIQUE DES COUCHES
   // ------------------------------------------------------------------
   function displayLayersOnMap() {
-    clearIsochroneLayers();
+    removeIsochroneMapLayers();
 
     // 1. Couche Isochrone A (Bleu semi-transparent, trait continu)
     if (state.geojsonData.A) {
@@ -786,6 +790,14 @@
       if (dom.toggleLayerCommon.checked) {
         state.layers.intersection.addTo(state.map);
       }
+    }
+
+    // Ordre visuel : s'assurer que A est en arrière-plan et l'intersection au premier plan
+    if (state.layers.A && state.map.hasLayer(state.layers.A)) {
+      state.layers.A.bringToBack();
+    }
+    if (state.layers.intersection && state.map.hasLayer(state.layers.intersection)) {
+      state.layers.intersection.bringToFront();
     }
 
     // Ajustement de la vue cartographique à l'ensemble des résultats
@@ -1007,7 +1019,9 @@
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(downloadUrl);
+    setTimeout(() => {
+      URL.revokeObjectURL(downloadUrl);
+    }, 1000);
 
     showStatus(`Export réussi : ${fileName}`, 'success');
   }
@@ -1305,6 +1319,7 @@
       if (state.layers.A) {
         if (dom.toggleLayerA.checked) {
           state.layers.A.addTo(state.map);
+          state.layers.A.bringToBack();
         } else {
           state.map.removeLayer(state.layers.A);
         }
@@ -1315,6 +1330,9 @@
       if (state.layers.B) {
         if (dom.toggleLayerB.checked) {
           state.layers.B.addTo(state.map);
+          if (state.layers.intersection && state.map.hasLayer(state.layers.intersection)) {
+            state.layers.intersection.bringToFront();
+          }
         } else {
           state.map.removeLayer(state.layers.B);
         }
@@ -1325,6 +1343,7 @@
       if (state.layers.intersection) {
         if (dom.toggleLayerCommon.checked) {
           state.layers.intersection.addTo(state.map);
+          state.layers.intersection.bringToFront();
         } else {
           state.map.removeLayer(state.layers.intersection);
         }
