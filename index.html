@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carte de double isochrone - Analyse d'accessibilité géographique</title>
+  <meta name="description" content="Application cartographique interactive permettant de calculer deux zones d'accessibilité (isochrones) indépendantes et d'analyser leur intersection géographique.">
+
+  <!-- Feuilles de style Leaflet (version stable et figée 1.9.4 avec SRI) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  >
+
+  <!-- Feuille de style personnalisée (chemin relatif strict pour GitHub Pages) -->
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+  <!-- En-tête de l'application -->
+  <header class="app-header" role="banner">
+    <div class="header-container">
+      <div class="header-titles">
+        <h1 class="main-title">Carte de double isochrone</h1>
+        <p class="subtitle">Identifiez la zone accessible depuis deux points de départ</p>
+      </div>
+      <p class="intro-text">
+        Définissez deux points de départ, un mode de transport et une durée pour chaque point. L’application calcule les deux zones accessibles et met en évidence leur intersection.
+      </p>
+
+      <!-- Alerte de configuration de la clé API -->
+      <div id="config-warning" class="alert-box alert-warning is-hidden" role="alert" aria-live="assertive">
+        <span class="alert-icon" aria-hidden="true">⚠️</span>
+        <div class="alert-content">
+          <strong>Configuration requise :</strong>
+          <span id="config-warning-text">La clé OpenRouteService n’est pas configurée. Renseignez-la dans le fichier config.js avant d’utiliser l’application.</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenu principal : Grille panneau paramètres + carte -->
+  <main class="app-main" role="main">
+    
+    <!-- Panneau latéral des paramètres et résultats -->
+    <aside class="sidebar-panel" aria-label="Paramètres de calcul et résultats">
+      
+      <!-- Zone des messages d'état et alertes dynamiques -->
+      <section class="status-zone" aria-label="État du système">
+        <div id="status-card" class="status-card is-hidden" role="status" aria-live="polite">
+          <div id="status-spinner" class="spinner is-hidden" aria-hidden="true"></div>
+          <div id="status-text" class="status-text">Prêt.</div>
+        </div>
+      </section>
+
+      <!-- BLOC POINT DE DÉPART A -->
+      <section class="card-point card-point-a" aria-labelledby="heading-point-a">
+        <div class="card-header">
+          <div class="point-badge badge-a" aria-hidden="true">A</div>
+          <h2 id="heading-point-a" class="card-title">Point de départ A</h2>
+        </div>
+
+        <div class="card-body">
+          <!-- Recherche d'adresse -->
+          <div class="form-group search-group">
+            <label for="search-a" class="form-label">Rechercher une adresse (A) :</label>
+            <div class="search-input-wrapper">
+              <input
+                type="text"
+                id="search-a"
+                class="form-input search-input"
+                placeholder="Ex. Place Royale, Pau..."
+                autocomplete="off"
+                aria-autocomplete="list"
+                aria-controls="suggestions-a"
+                aria-expanded="false"
+              >
+              <button type="button" id="btn-clear-search-a" class="btn-clear is-hidden" title="Effacer la recherche A" aria-label="Effacer la recherche A">&times;</button>
+            </div>
+            <!-- Liste de suggestions autocomplétion -->
+            <ul id="suggestions-a" class="suggestions-list is-hidden" role="listbox" aria-label="Suggestions d'adresses pour le point A"></ul>
+          </div>
+
+          <!-- Bouton de sélection sur la carte -->
+          <div class="form-group">
+            <button type="button" id="btn-select-map-a" class="btn btn-select-map" aria-pressed="false">
+              <span class="btn-icon" aria-hidden="true">📍</span>
+              <span class="btn-text">Sélectionner A sur la carte</span>
+            </button>
+          </div>
+
+          <!-- Affichage du point sélectionné -->
+          <div class="coordinates-box">
+            <div class="info-row">
+              <span class="info-label">Adresse :</span>
+              <span id="label-a" class="info-value info-address">Aucun point défini</span>
+            </div>
+            <div class="info-row-coords">
+              <span><strong>Lat :</strong> <span id="lat-a">—</span></span>
+              <span><strong>Lon :</strong> <span id="lon-a">—</span></span>
+            </div>
+          </div>
+
+          <!-- Sélecteur de mode de transport -->
+          <div class="form-group">
+            <label for="mode-a" class="form-label">Mode de transport (A) :</label>
+            <select id="mode-a" class="form-select">
+              <option value="driving-car" selected>🚗 Voiture</option>
+              <option value="cycling-regular">🚲 Vélo</option>
+              <option value="foot-walking">🚶 Marche</option>
+            </select>
+          </div>
+
+          <!-- Sélecteur de durée -->
+          <div class="form-group">
+            <div class="duration-label-row">
+              <label for="duration-a" class="form-label">Durée de trajet (A) :</label>
+              <span id="duration-display-a" class="duration-badge badge-a">30 min</span>
+            </div>
+            <div class="duration-inputs">
+              <input
+                type="range"
+                id="duration-a"
+                class="form-range range-a"
+                min="5"
+                max="120"
+                step="5"
+                value="30"
+                aria-label="Durée en minutes pour le point A (curseur)"
+              >
+              <div class="duration-number-wrapper">
+                <input
+                  type="number"
+                  id="duration-num-a"
+                  class="form-input duration-number"
+                  min="5"
+                  max="120"
+                  step="5"
+                  value="30"
+                  aria-label="Durée en minutes pour le point A (valeur numérique)"
+                >
+                <span class="duration-unit">min</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BLOC POINT DE DÉPART B -->
+      <section class="card-point card-point-b" aria-labelledby="heading-point-b">
+        <div class="card-header">
+          <div class="point-badge badge-b" aria-hidden="true">B</div>
+          <h2 id="heading-point-b" class="card-title">Point de départ B</h2>
+        </div>
+
+        <div class="card-body">
+          <!-- Recherche d'adresse -->
+          <div class="form-group search-group">
+            <label for="search-b" class="form-label">Rechercher une adresse (B) :</label>
+            <div class="search-input-wrapper">
+              <input
+                type="text"
+                id="search-b"
+                class="form-input search-input"
+                placeholder="Ex. Place de Verdun, Tarbes..."
+                autocomplete="off"
+                aria-autocomplete="list"
+                aria-controls="suggestions-b"
+                aria-expanded="false"
+              >
+              <button type="button" id="btn-clear-search-b" class="btn-clear is-hidden" title="Effacer la recherche B" aria-label="Effacer la recherche B">&times;</button>
+            </div>
+            <!-- Liste de suggestions autocomplétion -->
+            <ul id="suggestions-b" class="suggestions-list is-hidden" role="listbox" aria-label="Suggestions d'adresses pour le point B"></ul>
+          </div>
+
+          <!-- Bouton de sélection sur la carte -->
+          <div class="form-group">
+            <button type="button" id="btn-select-map-b" class="btn btn-select-map" aria-pressed="false">
+              <span class="btn-icon" aria-hidden="true">📍</span>
+              <span class="btn-text">Sélectionner B sur la carte</span>
+            </button>
+          </div>
+
+          <!-- Affichage du point sélectionné -->
+          <div class="coordinates-box">
+            <div class="info-row">
+              <span class="info-label">Adresse :</span>
+              <span id="label-b" class="info-value info-address">Aucun point défini</span>
+            </div>
+            <div class="info-row-coords">
+              <span><strong>Lat :</strong> <span id="lat-b">—</span></span>
+              <span><strong>Lon :</strong> <span id="lon-b">—</span></span>
+            </div>
+          </div>
+
+          <!-- Sélecteur de mode de transport -->
+          <div class="form-group">
+            <label for="mode-b" class="form-label">Mode de transport (B) :</label>
+            <select id="mode-b" class="form-select">
+              <option value="driving-car" selected>🚗 Voiture</option>
+              <option value="cycling-regular">🚲 Vélo</option>
+              <option value="foot-walking">🚶 Marche</option>
+            </select>
+          </div>
+
+          <!-- Sélecteur de durée -->
+          <div class="form-group">
+            <div class="duration-label-row">
+              <label for="duration-b" class="form-label">Durée de trajet (B) :</label>
+              <span id="duration-display-b" class="duration-badge badge-b">30 min</span>
+            </div>
+            <div class="duration-inputs">
+              <input
+                type="range"
+                id="duration-b"
+                class="form-range range-b"
+                min="5"
+                max="120"
+                step="5"
+                value="30"
+                aria-label="Durée en minutes pour le point B (curseur)"
+              >
+              <div class="duration-number-wrapper">
+                <input
+                  type="number"
+                  id="duration-num-b"
+                  class="form-input duration-number"
+                  min="5"
+                  max="120"
+                  step="5"
+                  value="30"
+                  aria-label="Durée en minutes pour le point B (valeur numérique)"
+                >
+                <span class="duration-unit">min</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BOUTONS D'ACTION PRINCIPAUX -->
+      <section class="actions-panel" aria-label="Actions de calcul et export">
+        <button type="button" id="btn-calculate" class="btn btn-primary btn-large">
+          <span class="btn-icon" aria-hidden="true">⚡</span>
+          <span class="btn-text">Calculer les zones accessibles</span>
+        </button>
+
+        <button type="button" id="btn-recenter" class="btn btn-secondary" disabled>
+          <span class="btn-icon" aria-hidden="true">🎯</span>
+          <span class="btn-text">Centrer sur les résultats</span>
+        </button>
+
+        <div class="export-actions-grid">
+          <button type="button" id="btn-export-a" class="btn btn-outline btn-export-a" disabled title="Exporter l'isochrone A au format GeoJSON">
+            <span class="btn-icon" aria-hidden="true">📥</span>
+            <span class="btn-text">Exporter l’isochrone A</span>
+          </button>
+          
+          <button type="button" id="btn-export-b" class="btn btn-outline btn-export-b" disabled title="Exporter l'isochrone B au format GeoJSON">
+            <span class="btn-icon" aria-hidden="true">📥</span>
+            <span class="btn-text">Exporter l’isochrone B</span>
+          </button>
+
+          <button type="button" id="btn-export-common" class="btn btn-outline btn-export-common" disabled title="Exporter la zone commune au format GeoJSON">
+            <span class="btn-icon" aria-hidden="true">📥</span>
+            <span class="btn-text">Exporter la zone commune</span>
+          </button>
+        </div>
+
+        <button type="button" id="btn-reset" class="btn btn-danger-outline" title="Réinitialiser l'ensemble des points et résultats">
+          <span class="btn-icon" aria-hidden="true">🔄</span>
+          <span class="btn-text">Réinitialiser</span>
+        </button>
+      </section>
+
+      <!-- PANNEAU DE RÉSULTATS -->
+      <section id="results-panel" class="results-panel is-hidden" aria-labelledby="heading-results">
+        <h2 id="heading-results" class="results-main-title">Résultats de l'analyse</h2>
+
+        <!-- Résultat A -->
+        <article class="result-card result-card-a">
+          <h3 class="result-title">Résultat A</h3>
+          <dl class="result-dl">
+            <div class="result-item">
+              <dt>Adresse / Position :</dt>
+              <dd id="res-addr-a">—</dd>
+            </div>
+            <div class="result-item">
+              <dt>Mode de transport :</dt>
+              <dd id="res-mode-a">—</dd>
+            </div>
+            <div class="result-item">
+              <dt>Durée :</dt>
+              <dd id="res-duration-a">—</dd>
+            </div>
+            <div class="result-item highlight-item">
+              <dt>Superficie :</dt>
+              <dd id="res-area-a" class="area-value">— km²</dd>
+            </div>
+          </dl>
+        </article>
+
+        <!-- Résultat B -->
+        <article class="result-card result-card-b">
+          <h3 class="result-title">Résultat B</h3>
+          <dl class="result-dl">
+            <div class="result-item">
+              <dt>Adresse / Position :</dt>
+              <dd id="res-addr-b">—</dd>
+            </div>
+            <div class="result-item">
+              <dt>Mode de transport :</dt>
+              <dd id="res-mode-b">—</dd>
+            </div>
+            <div class="result-item">
+              <dt>Durée :</dt>
+              <dd id="res-duration-b">—</dd>
+            </div>
+            <div class="result-item highlight-item">
+              <dt>Superficie :</dt>
+              <dd id="res-area-b" class="area-value">— km²</dd>
+            </div>
+          </dl>
+        </article>
+
+        <!-- Zone commune -->
+        <article class="result-card result-card-common">
+          <h3 class="result-title">Zone commune (Intersection)</h3>
+          <dl class="result-dl">
+            <div class="result-item">
+              <dt>Statut :</dt>
+              <dd id="res-common-status">—</dd>
+            </div>
+            <div class="result-item highlight-item">
+              <dt>Superficie commune :</dt>
+              <dd id="res-area-common" class="area-value area-common-value">— km²</dd>
+            </div>
+            <div class="result-item">
+              <dt>Part de l’isochrone A :</dt>
+              <dd id="res-share-a">— %</dd>
+            </div>
+            <div class="result-item">
+              <dt>Part de l’isochrone B :</dt>
+              <dd id="res-share-b">— %</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+    </aside>
+
+    <!-- Zone Cartographique -->
+    <section class="map-wrapper" aria-label="Carte interactive">
+      
+      <!-- Contrôles de visibilité des couches au-dessus de la carte -->
+      <div class="map-layer-toggles" aria-label="Affichage des couches">
+        <span class="layer-toggle-title">Couches :</span>
+        <label class="layer-toggle-label">
+          <input type="checkbox" id="toggle-layer-a" checked>
+          <span class="color-indicator ind-a" aria-hidden="true"></span>
+          <span>Isochrone A</span>
+        </label>
+        <label class="layer-toggle-label">
+          <input type="checkbox" id="toggle-layer-b" checked>
+          <span class="color-indicator ind-b" aria-hidden="true"></span>
+          <span>Isochrone B</span>
+        </label>
+        <label class="layer-toggle-label">
+          <input type="checkbox" id="toggle-layer-common" checked>
+          <span class="color-indicator ind-common" aria-hidden="true"></span>
+          <span>Intersection</span>
+        </label>
+      </div>
+
+      <!-- Conteneur Leaflet -->
+      <div id="map" class="map-container" role="region" aria-label="Carte des isochrones"></div>
+
+      <!-- Légende cartographique intégrée -->
+      <div id="map-legend" class="map-legend" aria-label="Légende cartographique">
+        <h4 class="legend-title">Légende</h4>
+        <ul class="legend-items">
+          <li class="legend-item">
+            <span class="legend-symbol symbol-marker-a" aria-hidden="true">A</span>
+            <span class="legend-label">Point A (Départ)</span>
+          </li>
+          <li class="legend-item">
+            <span class="legend-symbol symbol-marker-b" aria-hidden="true">B</span>
+            <span class="legend-label">Point B (Départ)</span>
+          </li>
+          <li class="legend-item">
+            <span class="legend-symbol symbol-poly-a" aria-hidden="true"></span>
+            <span class="legend-label">Isochrone A (trait plein bleu)</span>
+          </li>
+          <li class="legend-item">
+            <span class="legend-symbol symbol-poly-b" aria-hidden="true"></span>
+            <span class="legend-label">Isochrone B (tirets orange)</span>
+          </li>
+          <li class="legend-item">
+            <span class="legend-symbol symbol-poly-common" aria-hidden="true"></span>
+            <span class="legend-label">Zone commune (vert contour renforcé)</span>
+          </li>
+        </ul>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Pied de page avec attributions réglementaires -->
+  <footer class="app-footer" role="contentinfo">
+    <div class="footer-container">
+      <p class="footer-copy">
+        <strong>Double Isochrone</strong> &copy; 2026 — Outil d'analyse territoriale statique pour GitHub Pages.
+      </p>
+      <p class="footer-attributions">
+        Données cartographiques : &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">Contributeurs d'OpenStreetMap</a> |
+        Calculs d'itinéraires et isochrones : <a href="https://openrouteservice.org" target="_blank" rel="noopener noreferrer">OpenRouteService</a> |
+        Moteur cartographique : <a href="https://leafletjs.com" target="_blank" rel="noopener noreferrer">Leaflet 1.9.4</a> |
+        Analyse spatiale : <a href="https://turfjs.org" target="_blank" rel="noopener noreferrer">Turf.js 6.5.0</a>
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scripts externes (versions stables figées avec intégrité SRI) -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
+    integrity="sha256-0A8+j/io+cED2tYcL9S7WBQ+FASq398J4pttsaLeCj8="
+    crossorigin=""
+  ></script>
+
+  <!-- Configuration de la clé API (chargé obligatoirement avant app.js, chemin relatif strict) -->
+  <script src="./config.js"></script>
+
+  <!-- Script applicatif principal (chemin relatif strict) -->
+  <script src="./app.js"></script>
+
+</body>
+</html>

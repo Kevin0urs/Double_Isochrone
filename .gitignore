@@ -1,0 +1,34 @@
+# ====================================================================
+# .gitignore - Double Isochrone
+# ====================================================================
+#
+# Choix concernant config.js :
+# ----------------------------
+# Par défaut dans ce dépôt de développement, "config.js" est ignoré afin
+# d'éviter qu'un développeur ne committe accidentellement sa clé API privée
+# dans un dépôt Git public.
+#
+# IMPORTANT POUR GITHUB PAGES :
+# GitHub Pages sert uniquement les fichiers effectivement présents sur la
+# branche de publication. Si "config.js" est ignoré et absent du dépôt distant,
+# les visiteurs verront le message indiquant que la clé n'est pas configurée.
+#
+# Si vous souhaitez publier une version fonctionnelle directement sur GitHub Pages :
+# 1. Créez un compte et une clé API dédiée sur https://openrouteservice.org
+# 2. Renseignez cette clé dans config.js
+# 3. Retirez la ligne "config.js" ci-dessous (ou utilisez "git add -f config.js")
+# 4. Gardez à l'esprit que cette clé sera visible dans le code source public du site.
+#
+# Consultez le README.md pour une explication complète de la sécurité des clés.
+# ====================================================================
+
+# Décommentez la ligne ci-dessous si vous souhaitez empêcher le commit de votre clé locale :
+# config.js
+
+# Fichiers système et caches
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+*.tmp
